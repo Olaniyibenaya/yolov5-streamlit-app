@@ -1,5 +1,6 @@
-streamlit
 torch
-Pillow
+torchvision
+streamlit
 numpy
+pillow
 streamlit-lottie
