@@ -2,60 +2,77 @@ import streamlit as st
 import torch
 from PIL import Image
 import numpy as np
-import json
 import pathlib
-from streamlit_lottie import st_lottie
-from io import BytesIO
 
-# Optional: load Lottie animation
-lottie_animation = load_lottiefile("Animation.json")  # Replace with your own file if needed
-
-# For Colab path compatibility if running locally
+# Ensure compatibility with file paths on Windows
 temp = pathlib.PosixPath
 pathlib.PosixPath = pathlib.WindowsPath
 
-# Load your custom YOLOv5 model
+# 🔹 Load the YOLOv5 model trained on cassava diseases
 model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt', force_reload=True)
 
-# Page configuration
-st.set_page_config(page_title="Custom Object Detection App", page_icon="🎯", layout="wide")
+# 🔹 Define class names manually if not present in the .pt file
+model.names = [
+    'Cassava Mosaic Disease', 
+    'Cassava Brown Streak Disease', 
+    'Cassava Green Mite', 
+    'Healthy'
+]
 
-# Show animation
-st_lottie(lottie_animation, height=300, width=1000)
+# 🔹 Streamlit page configuration
+st.set_page_config(
+    page_title="Cassava Disease Detection",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# App title
-st.title("Custom Object Detection")
-st.write("Upload an image and this app will detect objects based on your trained model.")
+# 🔹 Page title and instructions
+st.title("Cassava Disease Detection App")
+st.write("Upload a cassava leaf image to detect whether it's healthy or infected.")
 
-# Sidebar: Confidence slider
+# 🔹 Sidebar - confidence threshold slider
 st.sidebar.header("Detection Settings")
-confidence_threshold = st.sidebar.slider("Confidence Threshold", 0.0, 1.0, 0.5, 0.05)
+confidence_threshold = st.sidebar.slider(
+    "Confidence Threshold", 
+    min_value=0.0, 
+    max_value=1.0, 
+    value=0.5, 
+    step=0.05
+)
 
-# File uploader
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# 🔹 Image uploader
+uploaded_file = st.file_uploader("Upload a cassava leaf image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     # Load image
-    image = Image.open(uploaded_file).convert("RGB")
+    image = Image.open(uploaded_file).convert('RGB')
 
-    # Set model confidence
+    # Set model confidence threshold
     model.conf = confidence_threshold
+
+    # Run inference
     results = model(image)
 
-    # Draw boxes on image
+    # Render image with bounding boxes
     img_with_boxes = np.array(results.render()[0])
     img_with_boxes = Image.fromarray(img_with_boxes)
 
-    # Display result
-    st.image(img_with_boxes, caption=f'{len(results.xyxy[0])} objects detected', use_column_width=True)
+    # Display the processed image
+    st.image(
+        img_with_boxes, 
+        caption=f'Detected: {len(results.xyxy[0])} region(s)', 
+        use_container_width=True
+    )
 
-    # Show class names
-    class_names = model.names
-    detected_classes = [class_names[int(cls)] for cls in results.pred[0][:, -1]]
-    st.write("Detected Classes:", detected_classes)
-
-    # Download button
-    buf = BytesIO()
-    img_with_boxes.save(buf, format="PNG")
-    byte_im = buf.getvalue()
-    st.download_button(label="Download Image", data=byte_im, file_name="output.png", mime="image/png")
+    # 🔹 Display detection results
+    st.subheader("Detection Summary")
+    if len(results.xyxy[0]) == 0:
+        st.info("No disease or object detected above the confidence threshold.")
+    else:
+        for *box, conf, cls in results.xyxy[0]:
+            class_id = int(cls)
+            class_name = model.names[class_id]
+            st.write(f"🔍 **{class_name}** — Confidence: `{conf:.2f}`")
+else:
+    st.warning("Please upload a cassava leaf image to start detection.")
