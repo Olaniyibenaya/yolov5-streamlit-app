@@ -1,18 +1,13 @@
 import streamlit as st
-import torch
+from ultralytics import YOLO
 from PIL import Image
 import numpy as np
-import pathlib
-
-# Ensure compatibility with file paths on Windows
-temp = pathlib.PosixPath
-pathlib.PosixPath = pathlib.WindowsPath
 
 # 🔹 Load the YOLOv5 model trained on cassava diseases
-model = torch.hub.load('ultralytics/yolov5', 'custom', path='best.pt', force_reload=True)
+model = YOLO('best.pt')
 
-# 🔹 Define class names manually if not present in the .pt file
-model.names = [
+# 🔹 Define class names manually (if needed)
+model.model.names = [
     'Cassava Mosaic Disease', 
     'Cassava Brown Streak Disease', 
     'Cassava Green Mite', 
@@ -45,34 +40,26 @@ confidence_threshold = st.sidebar.slider(
 uploaded_file = st.file_uploader("Upload a cassava leaf image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Load image
+    # Load and display uploaded image
     image = Image.open(uploaded_file).convert('RGB')
+    st.image(image, caption="Uploaded Image", use_container_width=True)
 
-    # Set model confidence threshold
-    model.conf = confidence_threshold
+    # Run detection
+    results = model.predict(image, conf=confidence_threshold)
 
-    # Run inference
-    results = model(image)
+    # Visualize results
+    for r in results:
+        img_with_boxes = r.plot()  # returns numpy array with boxes
+        st.image(img_with_boxes, caption="Detection Result", use_container_width=True)
 
-    # Render image with bounding boxes
-    img_with_boxes = np.array(results.render()[0])
-    img_with_boxes = Image.fromarray(img_with_boxes)
-
-    # Display the processed image
-    st.image(
-        img_with_boxes, 
-        caption=f'Detected: {len(results.xyxy[0])} region(s)', 
-        use_container_width=True
-    )
-
-    # 🔹 Display detection results
-    st.subheader("Detection Summary")
-    if len(results.xyxy[0]) == 0:
-        st.info("No disease or object detected above the confidence threshold.")
-    else:
-        for *box, conf, cls in results.xyxy[0]:
-            class_id = int(cls)
-            class_name = model.names[class_id]
-            st.write(f"🔍 **{class_name}** — Confidence: `{conf:.2f}`")
+        st.subheader("Detection Summary")
+        if len(r.boxes) == 0:
+            st.info("No disease or object detected above the confidence threshold.")
+        else:
+            for box in r.boxes:
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                class_name = model.model.names[cls]
+                st.write(f"🔍 **{class_name}** — Confidence: `{conf:.2f}`")
 else:
     st.warning("Please upload a cassava leaf image to start detection.")
