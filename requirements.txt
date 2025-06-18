@@ -1,7 +1,6 @@
-streamlit
 torch
 Pillow
 numpy
-opencv-python-headless
-ultralytics
-
+opencv-python
+matplotlib
+git+https://github.com/ultralytics/yolov5.git
